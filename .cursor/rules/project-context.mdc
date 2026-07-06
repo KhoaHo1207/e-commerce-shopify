@@ -1,0 +1,13 @@
+---
+description: Project context — read AGENTS.md before backend work
+alwaysApply: true
+---
+
+# Project Context
+
+Before editing backend code, read `AGENTS.md` (root) for architecture and file map.
+Human docs: `server/STRUCTURE.md`.
+
+- All backend code lives in `server/` — run commands from `server/` with pnpm
+- Stack: Express 5 + TypeScript ESM + MongoDB/Mongoose + Zod + jose + argon2
+- Entry: `server/src/server.ts` · App factory: `server/src/app.ts`
