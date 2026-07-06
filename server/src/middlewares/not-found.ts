@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { fail } from "../utils/envelope.js";
+import { fail } from "@/utils/envelope.js";
 
 export function notFound(req: Request, res: Response) {
   res
