@@ -1,8 +1,16 @@
-import { type Request, type Response } from "express";
-import { fail } from "@/utils/envelope.js";
+import type { RequestHandler } from "express";
 
-export function notFound(req: Request, res: Response) {
-  res
-    .status(404)
-    .json(fail(`Route not found ${req.method} ${req.originalUrl}`));
-}
+export const notFound: RequestHandler = (req, res) => {
+  res.status(404).json({
+    success: false,
+
+    status: "error",
+
+    errors: [
+      {
+        message: `Cannot ${req.method} ${req.originalUrl}`,
+        code: "NOT_FOUND",
+      },
+    ],
+  });
+};

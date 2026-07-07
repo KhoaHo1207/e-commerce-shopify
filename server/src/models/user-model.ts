@@ -1,5 +1,5 @@
 import type { UserRole } from "@/types/auth-type.js";
-import mongoose from "mongoose";
+import mongoose, { type Model } from "mongoose";
 
 export interface IAddress {
   fullName: string;
@@ -9,7 +9,6 @@ export interface IAddress {
   postalCode: string;
   isDefault: boolean;
 }
-
 export interface IUser {
   name: string;
   email: string;
@@ -23,9 +22,12 @@ export interface IUser {
   verificationTokenExpiresAt?: Date;
   resetPasswordToken?: string;
   resetPasswordTokenExpiresAt?: Date;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const addressSchema = new mongoose.Schema(
+const addressSchema = new mongoose.Schema<IAddress>(
   {
     fullName: {
       type: String,
@@ -62,7 +64,7 @@ const addressSchema = new mongoose.Schema(
   }
 );
 
-const userSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema<IUser>(
   {
     name: {
       type: String,
@@ -83,7 +85,6 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
       unique: true,
       index: true,
     },
@@ -127,6 +128,8 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-const User = mongoose.models.User || mongoose.model<IUser>("User", userSchema);
+const User =
+  (mongoose.models.User as Model<IUser>) ||
+  mongoose.model<IUser>("User", userSchema);
 
 export default User;
