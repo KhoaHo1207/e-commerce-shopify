@@ -8,30 +8,34 @@ alwaysApply: false
 
 ## Layer flow (strict)
 
-routes → [authenticate | validate] → controller → service → model
+routes → [validate] → controller → service → model → mapper → dto
 
-- Controllers: parse req, call service, `res.json(ok(...))` — no DB, no business logic
-- Services: business logic, `throw new AppError(status, msg)` — no req/res
+- Controllers: call service, `res.json(ok(...))` — no DB, no business logic
+- Services: business logic, throw typed errors (`ConflictError`, etc.) — no req/res
 - Routes: path + method + middleware only
+- Mappers: document → response DTO; input DTOs from Zod `z.infer`
 
 ## Imports & naming
 
 - Use `@/path/file.js` (ESM requires `.js` extension)
+- Import via barrel `index.ts` when available (`@/services/index.js`)
 - Files: kebab-case · Exports: camelCase · Classes: PascalCase
 
 ## Responses & errors
 
-- JSON APIs: `ok(data)` / `fail(message, code?)` from `@/utils/envelope.js`
-- Expected failures: throw `AppError` in service — import from `@/errors/app-error.js`; never manual `res.status` in service
-- Async controllers: wrap with `asyncHandler`
+- Success: `ok(data)` from `@/utils/envelope.js`
+- Errors: throw subclasses from `@/errors/index.js` — `new AppError(message, statusCode, code)`
+- `error-handler` builds error JSON manually (validation: `{ field, message }[]`)
+- Async controllers: wrap with `asyncHandler` from `@/middlewares/async-handler.js`
 
 ## Adding a feature
 
-1. validator → service → controller → route
-2. Register route in `routes/index.ts`
-3. Mount in `app.ts`: `app.use("/api/v1", apiRoutes)`
+1. validator → model → service → mapper/dto → controller → route
+2. Re-export in layer barrel `index.ts`
+3. Mount in `app.ts` (future: central `/api/v1` router in `routes/index.ts`)
 
 ## Do not
 
 - Put logic in wrong layer
 - Commit `.env` or add unrelated dependencies
+- Use `fail()` in controllers — throw errors, let `errorHandler` respond

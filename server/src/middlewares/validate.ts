@@ -14,7 +14,7 @@ export function validate(schema: ZodTypeAny) {
         message: issue.message,
       }));
 
-      throw new ValidationError(errors);
+      return next(new ValidationError(errors));
     }
 
     req.body = result.data;

@@ -19,80 +19,79 @@ Backend API cho ứng dụng thương mại điện tử, xây dựng bằng **N
 
 ---
 
-## Cây thư mục
+## Cây thư mục (hiện tại)
 
 ```
 server/
 ├── src/
-│   ├── app.ts                  # Khởi tạo Express app (middleware, routes)
-│   ├── server.ts               # Entry point — kết nối DB và start server
+│   ├── app.ts
+│   ├── server.ts
 │   │
-│   ├── config/                 # Cấu hình từ biến môi trường
+│   ├── config/
 │   │   ├── db.ts
 │   │   ├── jwt-config.ts
 │   │   └── password-config.ts
 │   │
-│   ├── routes/                 # Định nghĩa API endpoints
-│   │   ├── index.ts            # Gom và mount tất cả routes (/api/v1)
-│   │   ├── auth-routes.ts
-│   │   ├── user-routes.ts
-│   │   ├── product-routes.ts
-│   │   ├── cart-routes.ts
-│   │   └── order-routes.ts
+│   ├── routes/
+│   │   ├── index.ts              # barrel re-export
+│   │   └── auth-route.ts         # POST /register, /login
 │   │
-│   ├── controllers/            # Nhận request, trả response, gọi service
-│   │   ├── auth-controller.ts
-│   │   ├── user-controller.ts
-│   │   ├── product-controller.ts
-│   │   ├── cart-controller.ts
-│   │   └── order-controller.ts
+│   ├── controllers/
+│   │   ├── index.ts
+│   │   └── auth-controller.ts
 │   │
-│   ├── services/               # Business logic
-│   │   ├── auth-service.ts
-│   │   ├── user-service.ts
-│   │   ├── product-service.ts
-│   │   ├── cart-service.ts
-│   │   └── order-service.ts
+│   ├── services/
+│   │   ├── index.ts
+│   │   └── auth-service.ts
 │   │
-│   ├── models/                 # Mongoose schemas
-│   │   ├── user-model.ts
-│   │   ├── product-model.ts
-│   │   ├── category-model.ts
-│   │   ├── cart-model.ts
-│   │   └── order-model.ts
+│   ├── models/
+│   │   ├── index.ts
+│   │   └── user-model.ts
 │   │
-│   ├── validators/             # Zod schemas cho từng resource
-│   │   ├── auth-validator.ts
-│   │   ├── product-validator.ts
-│   │   ├── cart-validator.ts
-│   │   └── order-validator.ts
+│   ├── validators/
+│   │   ├── index.ts
+│   │   └── auth-validator.ts
 │   │
-│   ├── middlewares/            # Express middleware
-│   │   ├── async-handler.ts    # Bọc async route, forward lỗi → next()
-│   │   ├── authenticate.ts     # Xác thực JWT
-│   │   ├── validate.ts         # Validate body/query với Zod
-│   │   ├── error-handler.ts    # Global error handler
-│   │   └── not-found.ts        # 404 handler
+│   ├── middlewares/
+│   │   ├── async-handler.ts
+│   │   ├── validate.ts
+│   │   ├── error-handler.ts
+│   │   └── not-found.ts
 │   │
-│   ├── errors/                 # Custom error classes & mã lỗi
+│   ├── errors/
+│   │   ├── index.ts              # barrel
 │   │   ├── app-error.ts
-│   │   └── error-codes.ts
+│   │   ├── validation-error.ts
+│   │   ├── bad-request-error.ts
+│   │   ├── unauthorized-error.ts
+│   │   ├── forbidden-error.ts
+│   │   ├── not-found-error.ts
+│   │   ├── conflict-error.ts
+│   │   ├── too-many-requests-error.ts
+│   │   └── internal-server-error.ts
 │   │
-│   ├── types/                  # Shared TypeScript types
-│   │   ├── auth-type.ts
-│   │   └── api-type.ts
+│   ├── dto/
+│   │   └── auth-dto.ts
 │   │
-│   └── utils/                  # Helper functions dùng chung
-│       ├── envelope.ts         # Format response API (ok / fail)
+│   ├── mappers/
+│   │   └── user-mapper.ts
+│   │
+│   ├── types/
+│   │   └── auth-type.ts
+│   │
+│   └── utils/
+│       ├── envelope.ts
 │       ├── jwt-util.ts
 │       └── password-util.ts
 │
-├── dist/                       # Output sau khi build (tsc)
-├── .env                        # Biến môi trường (không commit)
+├── dist/
+├── .env
 ├── package.json
 ├── tsconfig.json
-└── STRUCTURE.md                # File này
+└── STRUCTURE.md
 ```
+
+**Chưa tạo:** `authenticate.ts`, các domain product/cart/order/user, `error-codes.ts`, `api-type.ts`.
 
 ---
 
@@ -100,110 +99,51 @@ server/
 
 ### `app.ts` & `server.ts`
 
-Tách riêng **cấu hình app** và **khởi động server**:
+- **`server.ts`** — `import "dotenv/config"` (phải load env trước mọi import khác), connect DB, listen.
+- **`app.ts`** — `createApp()`: middleware, routes, error handling.
 
-- **`app.ts`** — `createApp()`: đăng ký middleware, routes, error handling. Dễ test và tái sử dụng.
-- **`server.ts`** — Load `.env`, gọi `connectDb()`, `createApp()`, `app.listen()`.
-
-### `config/`
-
-Chứa cấu hình đọc từ `process.env`, tách khỏi business logic.
-
-| File | Nội dung |
-|------|----------|
-| `db.ts` | Kết nối MongoDB |
-| `jwt-config.ts` | Secret, thời hạn access/refresh token |
-| `password-config.ts` | Tuỳ chọn hash argon2 |
-
-### `routes/` → `controllers/` → `services/` → `models/`
-
-Luồng xử lý request theo kiến trúc phân lớp:
+### Luồng xử lý request
 
 ```
-HTTP Request
-    ↓
-routes/          Định nghĩa path & method (GET, POST, ...)
-    ↓
-middlewares/     authenticate, validate, ...
-    ↓
-controllers/     Parse request, gọi service, trả response
-    ↓
-services/        Business logic (không phụ thuộc Express)
-    ↓
-models/          Truy vấn / lưu dữ liệu MongoDB
+routes → validate(Zod) → controller → service → model
+                              ↓
+                         mapper → dto (response)
 ```
 
-**Ví dụ** khi implement đăng ký:
+| Layer | Vai trò |
+|-------|---------|
+| `routes/` | Định nghĩa path, method, middleware chain |
+| `validators/` | Zod schema + input DTO (`RegisterDto`, `LoginDto`) |
+| `controllers/` | Gọi service, `res.json(ok(...))`, set cookie/status |
+| `services/` | Business logic, throw typed errors |
+| `models/` | Mongoose schema |
+| `mappers/` | Transform document → response DTO |
+| `dto/` | Interface shape cho response |
+| `errors/` | `AppError` + subclasses theo HTTP status |
+| `middlewares/` | validate, error-handler, not-found |
 
-```
-POST /api/v1/auth/register
-  → auth-routes.ts
-  → validate(registerSchema)
-  → auth-controller.register
-  → auth-service.register
-  → user-model.create
-```
+### Barrel `index.ts`
 
-### `validators/`
-
-Zod schema validate dữ liệu đầu vào. Tách riêng khỏi controller để dễ test và tái sử dụng.
-
-### `middlewares/`
-
-| File | Vai trò |
-|------|---------|
-| `async-handler.ts` | Bọc handler async, tự động `catch` → `next(err)` |
-| `authenticate.ts` | Đọc JWT từ header, gắn `req.user` |
-| `validate.ts` | Parse & validate body/query bằng Zod schema |
-| `not-found.ts` | Trả 404 cho route không tồn tại |
-| `error-handler.ts` | Bắt mọi lỗi, trả response thống nhất |
-
-> Middleware global (cors, helmet, json, morgan) được đăng ký trực tiếp trong `app.ts`.
-
-### `errors/`
-
-- **`app-error.ts`** — Lỗi có kiểm soát (HTTP status + message). Service throw `AppError`, `error-handler` bắt và trả JSON.
-- **`error-codes.ts`** — Mã lỗi cố định (`USER_NOT_FOUND`, `INVALID_TOKEN`, ...).
-
-### `types/`
-
-TypeScript interfaces/types dùng chung giữa nhiều module (không chứa logic).
-
-### `utils/`
-
-Helper thuần function, không phụ thuộc Express:
-
-| File | Vai trò |
-|------|---------|
-| `envelope.ts` | `ok(data)` / `fail(message)` — format JSON response |
-| `jwt-util.ts` | `signAccessToken`, `verifyAccessToken`, ... |
-| `password-util.ts` | `hashPassword`, `verifyPassword` |
+Mỗi layer chính có `index.ts` re-export — import qua `@/services/index.js`, `@/errors/index.js`, v.v.
 
 ---
 
-## Luồng xử lý request
+## API endpoints
 
-```
-Client
-  │
-  ▼
-┌─────────────────────────────────────┐
-│  app.ts                             │
-│  cors → json → morgan → helmet      │
-│  routes (/api/v1/...)               │
-│  notFound                           │
-│  errorHandler                       │
-└─────────────────────────────────────┘
-  │
-  ▼
-Response JSON
-```
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/health` | Health check (plain text) |
+| POST | `/api/v1/auth/register` | Đăng ký — trả user (201) |
+| POST | `/api/v1/auth/login` | Đăng nhập — `accessToken` + user; `refreshToken` httpOnly cookie |
 
-### Format response
+Mount hiện tại: `app.use("/api/v1/auth", authRoute)` — chưa có router `/api/v1` trung tâm.
 
-Mọi API response dùng envelope thống nhất từ `utils/envelope.ts`:
+---
 
-**Thành công:**
+## Format response
+
+### Thành công — `ok()`
+
 ```json
 {
   "success": true,
@@ -212,14 +152,43 @@ Mọi API response dùng envelope thống nhất từ `utils/envelope.ts`:
 }
 ```
 
-**Lỗi:**
+### Lỗi — `error-handler` (chưa dùng `fail()`)
+
+**ValidationError (400):**
 ```json
 {
   "success": false,
   "status": "error",
-  "data": null,
-  "errors": [{ "message": "...", "code": "APP_ERROR" }]
+  "errors": [{ "field": "email", "message": "Invalid email" }]
 }
+```
+
+**AppError subclass (4xx):**
+```json
+{
+  "success": false,
+  "status": "error",
+  "errors": [{ "message": "Email already exists", "code": "CONFLICT" }]
+}
+```
+
+### Throw errors trong service
+
+```ts
+throw new ConflictError("Email already exists");
+throw new UnauthorizedError("Invalid email or password");
+// Base: new AppError(message, statusCode, code)
+```
+
+---
+
+## Middleware order
+
+```
+cors → json → urlencoded → morgan → helmet
+  → /api/v1/auth
+  → notFound
+  → errorHandler
 ```
 
 ---
@@ -229,22 +198,10 @@ Mọi API response dùng envelope thống nhất từ `utils/envelope.ts`:
 | Loại | Convention | Ví dụ |
 |------|------------|-------|
 | File | kebab-case | `auth-controller.ts` |
-| Export function | camelCase | `errorHandler`, `notFound` |
-| Class | PascalCase | `AppError` |
-| Type / Interface | PascalCase | `JwtPayload`, `UserRole` |
-| Model file | `{resource}-model.ts` | `user-model.ts` |
-| Route file | `{resource}-routes.ts` | `auth-routes.ts` |
-| Import path | Alias `@/` + extension `.js` | `@/config/db.js` |
-
----
-
-## Scripts
-
-```bash
-pnpm dev      # Chạy dev với hot-reload (tsx watch)
-pnpm build    # Compile TypeScript → dist/
-pnpm start    # Chạy production (node dist/server.js)
-```
+| Route file | `auth-route.ts` (hiện tại) | Có thể đổi → `auth-routes.ts` |
+| Export function | camelCase | `errorHandler`, `register` |
+| Class | PascalCase | `ConflictError` |
+| Import | `@/` + `.js` | `@/models/index.js` |
 
 ---
 
@@ -252,11 +209,23 @@ pnpm start    # Chạy production (node dist/server.js)
 
 | Biến | Mô tả |
 |------|-------|
-| `PORT` | Cổng server (mặc định `3000`) |
-| `MONGO_URI` | Connection string MongoDB |
-| `CORS_ORIGIN` | Danh sách origin, phân cách bằng dấu phẩy |
-| `JWT_ACCESS_SECRET` | Secret ký access token |
-| `JWT_REFRESH_SECRET` | Secret ký refresh token |
+| `PORT` | Cổng server |
+| `MONGO_URI` | MongoDB connection string |
+| `CORS_ORIGIN` | Origins, phân cách bằng dấu phẩy |
+| `JWT_ACCESS_SECRET` | Secret access token |
+| `JWT_REFRESH_SECRET` | Secret refresh token |
+| `JWT_ACCESS_EXPIRES_IN` | Mặc định `15m` |
+| `JWT_REFRESH_EXPIRES_IN` | Mặc định `7d` |
+
+---
+
+## Scripts
+
+```bash
+pnpm dev      # tsx watch src/server.ts
+pnpm build    # tsc && tsc-alias
+pnpm start    # node dist/server.js
+```
 
 ---
 
@@ -264,33 +233,46 @@ pnpm start    # Chạy production (node dist/server.js)
 
 ### Đã implement
 
-- Bootstrap: `app.ts`, `server.ts`
-- Config: DB, JWT, password
-- Middleware: `async-handler`, `error-handler`, `not-found`
-- Model: `user-model`
-- Validator: `registerSchema` (auth)
-- Utils: envelope, JWT, password hashing
-- Types: `JwtPayload`, `UserRole`
-- Errors: `AppError`
-- Endpoint: `GET /health`
+- Bootstrap, config, middleware (validate, error-handler, not-found)
+- Auth vertical slice: register + login
+- User model, auth validators, JWT/password utils
+- Error class hierarchy (8 subclasses)
+- DTO + mapper pattern
+- Barrel exports per layer
 
-### Chưa implement (file placeholder)
+### Cần chỉnh (technical debt)
 
-- Routes, controllers, services cho auth / user / product / cart / order
-- Middleware: `authenticate`, `validate`
-- Models: product, category, cart, order
-- Validators: product, cart, order
-- `errors/error-codes.ts`, `types/api-type.ts`
+| Ưu tiên | Vấn đề |
+|---------|--------|
+| Cao | `error-handler` / `not-found` không dùng `fail()` — envelope lỗi không thống nhất |
+| Cao | `asyncHandler` chưa wrap controllers |
+| Cao | `validate` dùng `throw` thay vì `next(err)` |
+| Cao | Chưa có `authenticate.ts` |
+| Trung bình | `routes/index.ts` chỉ là barrel, chưa aggregate router `/api/v1` |
+| Trung bình | `cookie-parser` cài nhưng chưa register |
+| Trung bình | `phone` unique index thiếu `sparse: true` |
+| Thấp | `LoginResponseDto` định nghĩa nhưng chưa dùng |
+| Thấp | Deps chưa dùng: cloudinary, multer, streamifier |
 
-### Bước tiếp theo gợi ý
+### Chưa implement
 
-1. Implement `routes/index.ts` — mount `/api/v1`
-2. Wire `auth-routes` → `auth-controller` → `auth-service`
-3. Viết `authenticate.ts` và `validate.ts`
-4. Đăng ký routes trong `app.ts`:
+- `authenticate.ts`, refresh/logout
+- Product, cart, order, user domains
+- Tests
 
-```ts
-// app.ts
-import apiRoutes from "@/routes/index.js";
-app.use("/api/v1", apiRoutes);
+---
+
+## Thêm feature mới
+
 ```
+1. validators/{x}-validator.ts   — Zod schema
+2. models/{x}-model.ts           — Mongoose schema
+3. dto/ + mappers/               — response shape
+4. services/{x}-service.ts       — business logic
+5. controllers/{x}-controller.ts — HTTP handler
+6. routes/{x}-route.ts           — Router + validate + controller
+7. routes/index.ts               — re-export / aggregate
+8. app.ts                        — mount route
+```
+
+AI agent context: xem `AGENTS.md` ở root repo.

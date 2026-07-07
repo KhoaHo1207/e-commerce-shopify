@@ -1,12 +1,15 @@
+export type ApiErrorItem = {
+  message: string;
+  code?: string;
+  field?: string;
+};
+
 export type ApiEnvelope<T> = {
   success: boolean;
   status: "success" | "error";
   data: T;
   meta?: Record<string, unknown>;
-  errors?: Array<{
-    message: string;
-    code?: string;
-  }>;
+  errors?: ApiErrorItem[];
 };
 
 export function ok<T>(data: T, meta?: Record<string, unknown>): ApiEnvelope<T> {
@@ -18,16 +21,20 @@ export function ok<T>(data: T, meta?: Record<string, unknown>): ApiEnvelope<T> {
   };
 }
 
-export function fail(message: string, code?: string): ApiEnvelope<null> {
+export function failErrors(errors: ApiErrorItem[]): ApiEnvelope<null> {
   return {
     success: false,
     status: "error",
     data: null,
-    errors: [
-      {
-        message,
-        ...(code !== undefined ? { code } : {}),
-      },
-    ],
+    errors,
   };
+}
+
+export function fail(message: string, code?: string): ApiEnvelope<null> {
+  return failErrors([
+    {
+      message,
+      ...(code !== undefined ? { code } : {}),
+    },
+  ]);
 }

@@ -4,3 +4,8 @@ export interface UserResponseDto {
   email: string;
   role: "user" | "admin";
 }
+
+export interface LoginResponseDto {
+  accessToken: string;
+  user: UserResponseDto;
+}

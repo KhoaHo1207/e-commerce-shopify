@@ -10,3 +10,5 @@ export class ValidationError extends AppError {
     super("Validation failed", 400, "VALIDATION_ERROR");
   }
 }
+
+//zod

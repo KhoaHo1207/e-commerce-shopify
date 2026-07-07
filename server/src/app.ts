@@ -4,12 +4,13 @@ import morgan from "morgan";
 import helmet from "helmet";
 import { notFound } from "@/middlewares/not-found.js";
 import { errorHandler } from "@/middlewares/error-handler.js";
-import authRoute from "./routes/auth-route.js";
+import { authRoute } from "@/routes/index.js";
+import cookieParser from "cookie-parser";
 
 export function createApp(): Express {
   const app: Express = express();
 
-  const corsOrigins = (process.env.CORS_ORIGIN || "")
+  const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -28,6 +29,7 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true }));
   app.use(morgan("dev"));
   app.use(helmet());
+  app.use(cookieParser());
 
   app.get("/health", (_req: Request, res: Response) => {
     res.send("Server is running");
