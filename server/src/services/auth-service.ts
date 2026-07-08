@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from "@/utils/password-util.js";
 
 import {
   ConflictError,
+  InternalServerError,
   NotFoundError,
   UnauthorizedError,
 } from "@/errors/index.js";
@@ -27,8 +28,14 @@ import {
   verifyRefreshToken,
 } from "@/utils/jwt-util.js";
 import crypto from "node:crypto";
+import { mailService } from "./mail-service.js";
+
+function hashOtp(otp: string): string {
+  return crypto.createHash("sha256").update(otp).digest("hex");
+}
+
 class AuthService {
-  async register(data: RegisterDto): Promise<UserResponseDto> {
+  async register(data: RegisterDto): Promise<void> {
     const existedUser = await User.findOne({
       email: data.email,
     });
@@ -36,6 +43,15 @@ class AuthService {
       throw new ConflictError("Email already exists");
     }
     const hashedPassword = await hashPassword(data.password);
+
+    const isPhoneNumberExists = await User.findOne({
+      phone: data.phone,
+    });
+
+    if (isPhoneNumberExists) {
+      throw new ConflictError("Phone number already exists");
+    }
+
     try {
       const user = await User.create({
         name: data.name,
@@ -43,10 +59,27 @@ class AuthService {
         password: hashedPassword,
         phone: data.phone,
       });
+      const otp = crypto.randomInt(100000, 1000000).toString();
 
-      return toUserResponse(user);
+      await User.findByIdAndUpdate(user.id, {
+        $set: {
+          otp: hashOtp(otp),
+          otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          otpSentAt: new Date(),
+          otpAttempts: 0,
+        },
+      });
+
+      try {
+        await mailService.sendOTP(user.email, otp);
+      } catch (error) {
+        throw new InternalServerError("Failed to send email");
+      }
     } catch (error) {
       if (error instanceof MongoServerError && error.code === 11000) {
+        if (error.keyPattern?.phone) {
+          throw new ConflictError("Phone number already exists");
+        }
         throw new ConflictError("Email already exists");
       }
       throw error;
@@ -78,6 +111,8 @@ class AuthService {
     const accessToken = await signAccessToken(payload);
     const refreshToken = await signRefreshToken(payload);
 
+    await User.findByIdAndUpdate(user.id, { refreshToken });
+
     return {
       accessToken,
       refreshToken,
@@ -89,7 +124,13 @@ class AuthService {
     if (!accessToken) {
       throw new UnauthorizedError("Unauthorized");
     }
-    const { userId } = await verifyAccessToken(accessToken);
+    let userId: string | undefined;
+    try {
+      ({ userId } = await verifyAccessToken(accessToken));
+    } catch {
+      throw new UnauthorizedError("Unauthorized");
+    }
+
     if (!userId) {
       throw new UnauthorizedError("Unauthorized");
     }
@@ -101,7 +142,13 @@ class AuthService {
       throw new UnauthorizedError("Unauthorized");
     }
 
-    const { userId } = await verifyRefreshToken(refreshToken);
+    let userId: string | undefined;
+    try {
+      ({ userId } = await verifyRefreshToken(refreshToken));
+    } catch {
+      throw new UnauthorizedError("Unauthorized");
+    }
+
     if (!userId) {
       throw new UnauthorizedError("Unauthorized");
     }
@@ -109,6 +156,10 @@ class AuthService {
     const user = await User.findById(userId);
     if (!user) {
       throw new NotFoundError("User not found");
+    }
+
+    if (!user.refreshToken || user.refreshToken !== refreshToken) {
+      throw new UnauthorizedError("Unauthorized");
     }
 
     const payload = {
@@ -129,7 +180,7 @@ class AuthService {
     };
   }
 
-  async sendOTP(data: SendOTPDto): Promise<string> {
+  async sendOTP(data: SendOTPDto): Promise<void> {
     const user = await User.findOne({ email: data.email });
 
     if (!user) {
@@ -151,16 +202,20 @@ class AuthService {
 
     const otp = crypto.randomInt(100000, 1000000).toString();
 
+    try {
+      await mailService.sendOTP(user.email, otp);
+    } catch (error) {
+      throw new InternalServerError("Failed to send email");
+    }
+
     await User.findByIdAndUpdate(user.id, {
       $set: {
-        otp,
+        otp: hashOtp(otp),
         otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
         otpSentAt: new Date(),
         otpAttempts: 0,
       },
     });
-
-    return otp;
   }
 
   async verifyOTP(data: VerifyOTPDto): Promise<void> {
@@ -195,7 +250,7 @@ class AuthService {
       throw new UnauthorizedError("OTP has expired");
     }
 
-    if (user.otp !== data.otp) {
+    if (user.otp !== hashOtp(data.otp)) {
       await User.findByIdAndUpdate(user.id, {
         $inc: {
           otpAttempts: 1,

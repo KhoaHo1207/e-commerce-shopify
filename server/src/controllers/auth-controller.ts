@@ -9,9 +9,9 @@ import {
 import type { LoginResponseDto } from "@/dto/auth-dto.js";
 
 export async function register(req: Request, res: Response): Promise<void> {
-  const user = await authService.register(req.body);
+  await authService.register(req.body);
 
-  res.status(201).json(ok(null));
+  res.status(201).json(ok({ message: "OTP has been sent to your email" }));
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
@@ -20,7 +20,6 @@ export async function login(req: Request, res: Response): Promise<void> {
   res.cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
 
   const body: LoginResponseDto = { user };
-  console.log(body);
   res.status(200).json(ok(body));
 }
 
@@ -28,8 +27,16 @@ export async function logout(req: Request, res: Response): Promise<void> {
   const { accessToken } = req.cookies;
   await authService.logout(accessToken);
 
-  res.clearCookie("accessToken");
-  res.clearCookie("refreshToken");
+  res.clearCookie("accessToken", {
+    path: accessTokenCookieOptions.path,
+    secure: accessTokenCookieOptions.secure,
+    sameSite: accessTokenCookieOptions.sameSite,
+  });
+  res.clearCookie("refreshToken", {
+    path: refreshTokenCookieOptions.path,
+    secure: refreshTokenCookieOptions.secure,
+    sameSite: refreshTokenCookieOptions.sameSite,
+  });
 
   res.status(200).json(ok(null));
 }
@@ -47,8 +54,8 @@ export async function refresh(req: Request, res: Response): Promise<void> {
 }
 
 export async function sendOTP(req: Request, res: Response): Promise<void> {
-  const otp = await authService.sendOTP(req.body);
-  res.status(200).json(ok(otp));
+  await authService.sendOTP(req.body);
+  res.status(200).json(ok({ message: "OTP has been sent to your email" }));
 }
 
 export async function verifyOTP(req: Request, res: Response): Promise<void> {

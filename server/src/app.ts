@@ -4,7 +4,7 @@ import morgan from "morgan";
 import helmet from "helmet";
 import { notFound } from "@/middlewares/not-found.js";
 import { errorHandler } from "@/middlewares/error-handler.js";
-import { authRoute } from "@/routes/index.js";
+import { apiRoutes } from "@/routes/index.js";
 import cookieParser from "cookie-parser";
 
 export function createApp(): Express {
@@ -35,7 +35,7 @@ export function createApp(): Express {
     res.send("Server is running");
   });
 
-  app.use("/api/v1/auth", authRoute);
+  app.use("/api/v1", apiRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

@@ -10,12 +10,15 @@ async function authenticateHandler(
   next: NextFunction
 ): Promise<void> {
   const authHeader = req.headers.authorization;
+  const accessTokenFromCookie = req.cookies?.accessToken as string | undefined;
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : undefined;
+  const token = bearerToken ?? accessTokenFromCookie;
 
-  if (!authHeader?.startsWith("Bearer ")) {
+  if (!token) {
     return next(new UnauthorizedError("Access token required"));
   }
-
-  const token = authHeader.slice(7);
 
   try {
     req.user = await verifyAccessToken(token);

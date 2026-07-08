@@ -11,8 +11,8 @@ E-commerce REST API backend. Monorepo root: `e-commerce-shopify/` — **all code
 | Stack | Node, Express 5, TypeScript (ESM), MongoDB/Mongoose, Zod, jose (JWT), argon2 |
 | Entry | `server/src/server.ts` — `import "dotenv/config"`, `connectDb()`, `createApp()`, listen |
 | App | `server/src/app.ts` — `createApp()`: middleware, routes, `notFound`, `errorHandler` |
-| API prefix | `/api/v1/auth` mounted in `app.ts` (central `apiRoutes` router not yet) |
-| Live endpoints | `GET /health` · `POST /api/v1/auth/register` · `POST /api/v1/auth/login` |
+| API prefix | `/api/v1` mounted in `app.ts` via central `apiRoutes` router |
+| Live endpoints | `GET /health` · `POST /api/v1/auth/register` · `POST /api/v1/auth/login` · `POST /api/v1/auth/logout` · `POST /api/v1/auth/refresh-token` · `POST /api/v1/auth/send-otp` · `POST /api/v1/auth/verify-otp` |
 | Package mgr | pnpm (`cwd`: `server/`) |
 
 ## Architecture
@@ -44,18 +44,19 @@ HTTP → routes → [validate] → controller → service → model → mapper �
 ```
 server/src/
   app.ts, server.ts
-  config/       db.ts, jwt-config.ts, password-config.ts
-  routes/       index.ts (barrel), auth-route.ts ✓
+  config/       db.ts, jwt-config.ts, password-config.ts, mail.ts
+  routes/       index.ts (central Router), auth-route.ts ✓
   controllers/  index.ts (barrel), auth-controller.ts ✓
   services/     index.ts (barrel), auth-service.ts ✓
   models/       index.ts (barrel), user-model.ts ✓
   validators/   index.ts (barrel), auth-validator.ts ✓
-  middlewares/  async-handler.ts ✓, validate.ts ✓, error-handler.ts ✓, not-found.ts ✓
-                authenticate.ts ✗
+  middlewares/  async-handler.ts ✓, validate.ts ✓, error-handler.ts ✓, not-found.ts ✓,
+                authenticate.ts ✓
   errors/       app-error.ts ✓ + 8 subclasses ✓, index.ts (barrel)
   dto/          auth-dto.ts ✓
   mappers/      user-mapper.ts ✓
   types/        auth-type.ts ✓
+  templates/    otp-template.ts ✓
   utils/        envelope.ts ✓, jwt-util.ts ✓, password-util.ts ✓
 ```
 
@@ -101,20 +102,20 @@ Base: `new AppError(message, statusCode, code)`.
 | Password | `utils/password-util.ts` + `config/password-config.ts` |
 | Response map | `mappers/user-mapper.ts` → `dto/auth-dto.ts` |
 
-Login: `accessToken` in body, `refreshToken` in httpOnly cookie.
-Register: returns user only (no tokens).
-
-**Missing:** `authenticate.ts`, refresh/logout endpoints, `cookie-parser` in `app.ts`.
+Login: `accessToken` + `refreshToken` set in httpOnly cookies; response body returns `user`.
+Register: creates account and sends OTP email.
+Refresh: rotates access/refresh token pair.
+Logout: clears cookies and invalidates refresh token in DB.
 
 ## Middleware order (`app.ts`)
 
 ```
-cors → json → urlencoded → morgan → helmet → /api/v1/auth → notFound → errorHandler
+cors → json → urlencoded → morgan → helmet → cookieParser → /api/v1 → notFound → errorHandler
 ```
 
-Wrap async controllers with `asyncHandler` (convention; not yet applied to auth).
+Auth routes already wrap controllers with `asyncHandler`.
 
-`validate(schema)` — Zod safeParse; throws `ValidationError` on failure.
+`validate(schema)` — Zod safeParse; passes `ValidationError` via `next(err)`.
 
 ## Env vars (`server/.env`)
 
@@ -142,16 +143,14 @@ cd server && pnpm start    # node dist/server.js
 
 ## Known gaps (fix when touching area)
 
-1. `error-handler` / `not-found` don't use `fail()` — envelope inconsistent on errors
-2. `validate` throws instead of `next(err)`
-3. `asyncHandler` not wired on controllers
-4. `routes/index.ts` is barrel only — refactor to central `Router()` when adding resources
-5. `phone` unique index needs `sparse: true` if optional
-6. `cookie-parser` installed but not registered
+1. Add global/IP rate limiting for login/OTP endpoints
+2. Reduce account enumeration signals in OTP/auth error messages
+3. Add OTP hashing migration for existing stored OTP values if legacy rows exist
+4. Add tests for register/login/refresh/logout/OTP flows
 
 ## Implement next
 
-1. `middlewares/authenticate.ts` + `cookie-parser` in `app.ts`
-2. Refresh token / logout endpoints
-3. Central `apiRoutes` in `routes/index.ts`
-4. Product domain (model → service → controller → route)
+1. Product domain (model → service → controller → route)
+2. Cart domain
+3. Order domain
+4. Harden auth abuse protection (rate limit + lockout policy)

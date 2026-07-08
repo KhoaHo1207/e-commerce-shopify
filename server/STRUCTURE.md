@@ -30,11 +30,12 @@ server/
 │   ├── config/
 │   │   ├── db.ts
 │   │   ├── jwt-config.ts
+│   │   ├── mail.ts
 │   │   └── password-config.ts
 │   │
 │   ├── routes/
-│   │   ├── index.ts              # barrel re-export
-│   │   └── auth-route.ts         # POST /register, /login
+│   │   ├── index.ts              # central /api/v1 router
+│   │   └── auth-route.ts         # register/login/logout/refresh/otp
 │   │
 │   ├── controllers/
 │   │   ├── index.ts
@@ -54,9 +55,13 @@ server/
 │   │
 │   ├── middlewares/
 │   │   ├── async-handler.ts
+│   │   ├── authenticate.ts
 │   │   ├── validate.ts
 │   │   ├── error-handler.ts
 │   │   └── not-found.ts
+│   │
+│   ├── templates/
+│   │   └── otp-template.ts
 │   │
 │   ├── errors/
 │   │   ├── index.ts              # barrel
@@ -91,7 +96,7 @@ server/
 └── STRUCTURE.md
 ```
 
-**Chưa tạo:** `authenticate.ts`, các domain product/cart/order/user, `error-codes.ts`, `api-type.ts`.
+**Chưa tạo:** các domain product/cart/order/user, `error-codes.ts`, `api-type.ts`.
 
 ---
 
@@ -124,7 +129,7 @@ routes → validate(Zod) → controller → service → model
 
 ### Barrel `index.ts`
 
-Mỗi layer chính có `index.ts` re-export — import qua `@/services/index.js`, `@/errors/index.js`, v.v.
+Mỗi layer chính có `index.ts` re-export; `routes/index.ts` hiện đóng vai trò aggregate router (`apiRoutes`).
 
 ---
 
@@ -133,10 +138,14 @@ Mỗi layer chính có `index.ts` re-export — import qua `@/services/index.js`
 | Method | Path | Mô tả |
 |--------|------|-------|
 | GET | `/health` | Health check (plain text) |
-| POST | `/api/v1/auth/register` | Đăng ký — trả user (201) |
-| POST | `/api/v1/auth/login` | Đăng nhập — `accessToken` + user; `refreshToken` httpOnly cookie |
+| POST | `/api/v1/auth/register` | Đăng ký + gửi OTP xác thực email |
+| POST | `/api/v1/auth/login` | Đăng nhập — set `accessToken`/`refreshToken` httpOnly cookie + trả user |
+| POST | `/api/v1/auth/logout` | Đăng xuất — clear cookie + invalidate refresh token |
+| POST | `/api/v1/auth/refresh-token` | Rotate access/refresh token bằng refresh cookie |
+| POST | `/api/v1/auth/send-otp` | Gửi lại OTP xác thực email |
+| POST | `/api/v1/auth/verify-otp` | Xác thực OTP để kích hoạt tài khoản |
 
-Mount hiện tại: `app.use("/api/v1/auth", authRoute)` — chưa có router `/api/v1` trung tâm.
+Mount hiện tại: `app.use("/api/v1", apiRoutes)`; auth được mount qua `apiRoutes.use("/auth", authRoute)`.
 
 ---
 
@@ -152,7 +161,7 @@ Mount hiện tại: `app.use("/api/v1/auth", authRoute)` — chưa có router `/
 }
 ```
 
-### Lỗi — `error-handler` (chưa dùng `fail()`)
+### Lỗi — `error-handler` + envelope helpers (`fail()`, `failErrors()`)
 
 **ValidationError (400):**
 ```json
@@ -185,8 +194,8 @@ throw new UnauthorizedError("Invalid email or password");
 ## Middleware order
 
 ```
-cors → json → urlencoded → morgan → helmet
-  → /api/v1/auth
+cors → json → urlencoded → morgan → helmet → cookieParser
+  → /api/v1
   → notFound
   → errorHandler
 ```
@@ -244,19 +253,14 @@ pnpm start    # node dist/server.js
 
 | Ưu tiên | Vấn đề |
 |---------|--------|
-| Cao | `error-handler` / `not-found` không dùng `fail()` — envelope lỗi không thống nhất |
-| Cao | `asyncHandler` chưa wrap controllers |
-| Cao | `validate` dùng `throw` thay vì `next(err)` |
-| Cao | Chưa có `authenticate.ts` |
-| Trung bình | `routes/index.ts` chỉ là barrel, chưa aggregate router `/api/v1` |
-| Trung bình | `cookie-parser` cài nhưng chưa register |
-| Trung bình | `phone` unique index thiếu `sparse: true` |
-| Thấp | `LoginResponseDto` định nghĩa nhưng chưa dùng |
+| Cao | Chưa có rate limiting toàn cục cho login/OTP endpoints |
+| Cao | Auth/OTP còn lộ signal giúp account enumeration ở một số message |
+| Trung bình | Cần policy migration nếu có bản ghi OTP cũ lưu plaintext |
+| Trung bình | Chưa có test tự động cho auth + otp + refresh/logout |
 | Thấp | Deps chưa dùng: cloudinary, multer, streamifier |
 
 ### Chưa implement
 
-- `authenticate.ts`, refresh/logout
 - Product, cart, order, user domains
 - Tests
 

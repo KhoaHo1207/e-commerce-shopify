@@ -11,4 +11,4 @@ Human docs: `server/STRUCTURE.md`.
 - All backend code lives in `server/` — run commands from `server/` with pnpm
 - Stack: Express 5 + TypeScript ESM + MongoDB/Mongoose + Zod + jose + argon2
 - Entry: `server/src/server.ts` · App factory: `server/src/app.ts`
-- Auth live: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`
+- Auth live: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/refresh-token`, `POST /api/v1/auth/send-otp`, `POST /api/v1/auth/verify-otp`

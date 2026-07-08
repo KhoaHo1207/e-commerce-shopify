@@ -25,7 +25,7 @@ routes → [validate] → controller → service → model → mapper → dto
 
 - Success: `ok(data)` from `@/utils/envelope.js`
 - Errors: throw subclasses from `@/errors/index.js` — `new AppError(message, statusCode, code)`
-- `error-handler` builds error JSON manually (validation: `{ field, message }[]`)
+- `error-handler` should respond via envelope helpers (`fail`, `failErrors`)
 - Async controllers: wrap with `asyncHandler` from `@/middlewares/async-handler.js`
 
 ## Adding a feature
