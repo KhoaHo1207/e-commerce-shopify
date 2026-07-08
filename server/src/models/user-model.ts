@@ -18,8 +18,11 @@ export interface IUser {
   points: number;
   addresses: IAddress[];
   isVerified: boolean;
-  verificationToken?: string;
-  verificationTokenExpiresAt?: Date;
+  refreshToken?: string;
+  otp?: string;
+  otpSentAt?: Date;
+  otpExpiresAt?: Date;
+  otpAttempts: number;
   resetPasswordToken?: string;
   resetPasswordTokenExpiresAt?: Date;
 
@@ -105,13 +108,25 @@ const userSchema = new mongoose.Schema<IUser>(
       type: Boolean,
       default: false,
     },
-    verificationToken: {
+    refreshToken: {
+      type: String,
+    },
+    otp: {
       type: String,
       required: false,
       trim: true,
     },
-    verificationTokenExpiresAt: {
+    otpSentAt: {
       type: Date,
+      required: false,
+    },
+    otpExpiresAt: {
+      type: Date,
+    },
+    otpAttempts: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     resetPasswordToken: {
       type: String,
